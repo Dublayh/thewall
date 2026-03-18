@@ -572,7 +572,64 @@
 
     #cam-container { bottom: env(safe-area-inset-bottom, 12px); left: 12px; }
     #cam-feed { width: 80px; height: 60px; }
+    #cheat-flash h2 { font-size: 2rem; }
+    #cheat-flash p { font-size: 0.85rem; padding: 0 20px; text-align: center; }
   }
+
+  /* ---- FULLSCREEN CHEAT FLASH ---- */
+  #cheat-flash {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: #000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 20px;
+    animation: cheatPulse 0.6s ease-in-out infinite alternate;
+  }
+  #cheat-flash.active { display: flex; }
+  @keyframes cheatPulse {
+    from { background: #0a0000; }
+    to   { background: #1a0000; }
+  }
+  #cheat-flash h2 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 3rem;
+    color: var(--red);
+    letter-spacing: 0.15em;
+    text-shadow: 0 0 30px var(--glow), 2px 2px 0 #000;
+    text-align: center;
+    animation: shake 0.25s infinite;
+  }
+  #cheat-flash p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    color: #cc7755;
+    text-align: center;
+    line-height: 1.7;
+  }
+  #cheat-flash .cheat-sub {
+    font-size: 0.8rem;
+    color: #664433;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  #reenter-btn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    background: var(--red);
+    border: none;
+    padding: 12px 36px;
+    cursor: pointer;
+    border-radius: 2px;
+    box-shadow: 0 4px 0 #7a0000;
+    margin-top: 8px;
+    transition: all 0.1s;
+  }
+  #reenter-btn:hover { background: #ee1500; transform: translateY(-2px); }
 </style>
 </head>
 <body>
@@ -645,6 +702,14 @@
 <div id="look-away-flash">
   <h2>EYES ON THE WALL</h2>
   <p id="look-away-sub">Look away penalty applied. Keep staring.</p>
+</div>
+
+<!-- FULLSCREEN CHEAT FLASH -->
+<div id="cheat-flash">
+  <h2>NICE TRY, CHEATER</h2>
+  <p>You exited fullscreen.<br>Probably trying to check the time.<br>The clock has been <strong style="color:var(--red)">reset to zero.</strong></p>
+  <p class="cheat-sub">This is what happens when you finish last.</p>
+  <button id="reenter-btn" onclick="reenterFullscreen()">BACK TO YOUR PUNISHMENT</button>
 </div>
 
 <div id="penalty-display" style="display:none">
@@ -822,6 +887,41 @@
     startPunishment();
   }
 
+  // ---- FULLSCREEN ----
+  function enterFullscreen() {
+    const el = document.documentElement;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+  }
+
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement);
+  }
+
+  function reenterFullscreen() {
+    document.getElementById('cheat-flash').classList.remove('active');
+    enterFullscreen();
+  }
+
+  // Listen for fullscreen exit during punishment only
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+  document.addEventListener('mozfullscreenchange', onFullscreenChange);
+
+  function onFullscreenChange() {
+    if (!startTime) return; // only care during active punishment
+    if (!isFullscreen()) {
+      // They escaped — reset the clock and scold them
+      accumulatedMs = 0;
+      lastTick = null;
+      penalties = 0;
+      updatePenaltyDisplay();
+      document.getElementById('look-away-flash').classList.remove('active');
+      document.getElementById('cheat-flash').classList.add('active');
+    }
+  }
+
   // ---- START PUNISHMENT (after calibration) ----
   function startPunishment() {
     showScreen('stare-screen');
@@ -842,6 +942,7 @@
     lastTick = null;
     updatePenaltyDisplay();
 
+    enterFullscreen();
     startLandmarkTracking(monVideo);
   }
 
@@ -971,6 +1072,7 @@
     awayFrames = 0; presentFrames = 0;
     calibBaseline = { yawRatio: 0, pitchRatio: 0 };
     document.getElementById('look-away-flash').classList.remove('active');
+    document.getElementById('cheat-flash').classList.remove('active');
     document.getElementById('calib-btn').disabled = true;
     document.getElementById('calib-status').textContent = 'Initializing camera...';
     document.getElementById('calib-status').className = '';
