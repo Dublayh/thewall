@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>THE WALL</title>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Oswald:wght@700&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --brick: #8B4513;
+    --brick-dark: #5C2E0A;
+    --mortar: #C8A882;
+    --red: #CC1100;
+    --dim-red: #660800;
+    --glow: rgba(204,17,0,0.4);
+    --text: #F0E6D0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0a00;
+    color: var(--text);
+    font-family: 'Special Elite', serif;
+    height: 100vh;
+    overflow: hidden;
+    cursor: default;
+    user-select: none;
+  }
+
+  /* BRICK WALL BACKGROUND */
+  #wall {
+    position: fixed;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 38px,
+        rgba(0,0,0,0.55) 38px,
+        rgba(0,0,0,0.55) 42px
+      ),
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 58px,
+        rgba(0,0,0,0.35) 58px,
+        rgba(0,0,0,0.36) 62px
+      );
+    background-color: #7a3b18;
+    background-size: 120px 40px;
+    animation: brickShift 0.05s steps(1) infinite;
+    z-index: 0;
+  }
+
+  /* Staggered brick rows */
+  #wall::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 58px,
+        rgba(0,0,0,0.3) 58px,
+        rgba(0,0,0,0.3) 62px
+      );
+    background-size: 120px 80px;
+    background-position: 60px 40px;
+  }
+
+  #wall::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 40%, rgba(0,0,0,0.75) 100%);
+  }
+
+  /* OVERLAY - dims when looking away */
+  #overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0);
+    z-index: 1;
+    transition: background 0.3s;
+    pointer-events: none;
+  }
+
+  /* CONTENT */
+  #content {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 0;
+  }
+
+  /* SCREENS */
+  .screen { display: none; flex-direction: column; align-items: center; gap: 24px; }
+  .screen.active { display: flex; }
+
+  /* ---- SETUP SCREEN ---- */
+  #setup-screen {
+    background: rgba(0,0,0,0.7);
+    border: 2px solid var(--brick);
+    padding: 40px 60px;
+    border-radius: 4px;
+    max-width: 560px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8);
+  }
+
+  #setup-screen h1 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 3.2rem;
+    color: var(--red);
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 20px var(--glow), 2px 2px 0 #000;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  #setup-screen .subtitle {
+    font-size: 1rem;
+    color: var(--mortar);
+    margin-bottom: 28px;
+    letter-spacing: 0.05em;
+  }
+
+  .rules {
+    text-align: left;
+    border-left: 3px solid var(--red);
+    padding-left: 16px;
+    margin-bottom: 28px;
+  }
+
+  .rules li {
+    list-style: none;
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .rules li::before { content: '▶  '; color: var(--red); font-size: 0.7rem; }
+
+  .camera-note {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--mortar);
+    background: rgba(0,0,0,0.4);
+    border: 1px solid #555;
+    padding: 10px 14px;
+    border-radius: 3px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  #start-btn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.15em;
+    color: var(--text);
+    background: var(--red);
+    border: none;
+    padding: 14px 48px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 4px 0 #7a0000, 0 0 20px var(--glow);
+    transition: all 0.1s;
+    border-radius: 2px;
+  }
+
+  #start-btn:hover { background: #ee1500; transform: translateY(-2px); box-shadow: 0 6px 0 #7a0000, 0 0 30px var(--glow); }
+  #start-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #7a0000; }
+
+  /* ---- STARE SCREEN ---- */
+  #stare-screen { width: 100%; height: 100vh; position: relative; }
+
+  #crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+  }
+
+  #crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background: var(--red);
+  }
+  #crosshair::before { width: 2px; height: 100%; left: 50%; transform: translateX(-50%); }
+  #crosshair::after { height: 2px; width: 100%; top: 50%; transform: translateY(-50%); }
+
+  .ch-circle {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 2px solid var(--red);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  .ch-circle:nth-child(1) { width: 24px; height: 24px; }
+  .ch-circle:nth-child(2) { width: 60px; height: 60px; animation-delay: 0.5s; opacity: 0.6; }
+  .ch-circle:nth-child(3) { width: 90px; height: 90px; animation-delay: 1s; opacity: 0.3; }
+
+  @keyframes pulse {
+    0%, 100% { transform: translate(-50%,-50%) scale(1); opacity: inherit; }
+    50% { transform: translate(-50%,-50%) scale(1.1); opacity: 0.3; }
+  }
+
+  #stare-label {
+    position: absolute;
+    top: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.6rem;
+    letter-spacing: 0.25em;
+    color: var(--red);
+    text-shadow: 0 0 15px var(--glow);
+    white-space: nowrap;
+    animation: flicker 6s infinite;
+  }
+
+  @keyframes flicker {
+    0%,19%,21%,23%,25%,54%,56%,100% { opacity: 1; }
+    20%,24%,55% { opacity: 0.4; }
+  }
+
+  #look-away-flash {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(180,0,0,0.0);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    animation: warningPulse 0.5s ease-in-out infinite alternate;
+  }
+
+  #look-away-flash.active { display: flex; }
+
+  @keyframes warningPulse {
+    from { background: rgba(150,0,0,0.55); }
+    to { background: rgba(200,0,0,0.75); }
+  }
+
+  #look-away-flash h2 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 4rem;
+    letter-spacing: 0.2em;
+    color: #fff;
+    text-shadow: 0 0 30px #fff, 2px 2px 0 #000;
+    animation: shake 0.3s infinite;
+  }
+
+  #look-away-flash p {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.1rem;
+    color: #ffcccc;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  /* Penalty counter */
+  #penalty-display {
+    position: fixed;
+    top: 20px;
+    right: 28px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.85rem;
+    color: #aa4422;
+    z-index: 20;
+    text-align: right;
+  }
+
+  #penalty-display span {
+    color: var(--red);
+    font-size: 1.1rem;
+    font-weight: bold;
+  }
+
+  /* Camera feed (small, for feedback) */
+  #cam-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 20;
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+  #cam-container:hover { opacity: 1; }
+
+  #cam-feed {
+    width: 100px;
+    height: 75px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    transform: scaleX(-1);
+    display: block;
+  }
+
+  #cam-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    color: #666;
+    text-align: center;
+    margin-top: 3px;
+  }
+
+  #eye-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.7rem;
+    text-align: center;
+    margin-top: 2px;
+  }
+  #eye-status.ok { color: #44aa44; }
+  #eye-status.warn { color: var(--red); }
+  #eye-status.no-cam { color: #666; }
+
+  /* Done button */
+  #done-btn {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+    color: #888;
+    background: rgba(0,0,0,0.6);
+    border: 1px solid #444;
+    padding: 10px 22px;
+    cursor: pointer;
+    border-radius: 2px;
+    z-index: 30;
+    transition: all 0.2s;
+  }
+  #done-btn:hover { color: var(--text); border-color: #777; }
+
+  /* ---- REVEAL SCREEN ---- */
+  #reveal-screen {
+    background: rgba(0,0,0,0.85);
+    border: 2px solid var(--brick);
+    padding: 48px 64px;
+    border-radius: 4px;
+    text-align: center;
+    box-shadow: 0 0 60px rgba(0,0,0,0.9);
+    max-width: 520px;
+  }
+
+  #reveal-screen h2 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2rem;
+    color: var(--mortar);
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+
+  #elapsed-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 4rem;
+    color: var(--red);
+    text-shadow: 0 0 30px var(--glow);
+    margin: 16px 0;
+    letter-spacing: 0.1em;
+  }
+
+  #result-msg {
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  #result-msg.fail { color: #ff6644; }
+  #result-msg.win { color: #88cc44; }
+
+  #penalties-summary {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--mortar);
+    margin-bottom: 28px;
+  }
+
+  .reveal-btn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    border: none;
+    padding: 12px 36px;
+    cursor: pointer;
+    border-radius: 2px;
+    text-transform: uppercase;
+    margin: 6px;
+    transition: all 0.15s;
+  }
+
+  #try-again-btn { background: var(--red); box-shadow: 0 4px 0 #7a0000; }
+  #try-again-btn:hover { background: #ee2200; transform: translateY(-2px); }
+
+  #done-forever-btn { background: #334; box-shadow: 0 4px 0 #111; color: #aaa; }
+  #done-forever-btn:hover { background: #445; color: #ccc; }
+
+  /* ---- CALIBRATION SCREEN ---- */
+  #calibration-screen {
+    background: rgba(0,0,0,0.82);
+    border: 2px solid var(--brick);
+    padding: 40px 52px;
+    border-radius: 4px;
+    text-align: center;
+    max-width: 500px;
+    box-shadow: 0 0 50px rgba(0,0,0,0.9);
+  }
+
+  #calibration-screen h2 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 2rem;
+    color: var(--red);
+    letter-spacing: 0.15em;
+    margin-bottom: 8px;
+    text-shadow: 0 0 15px var(--glow);
+  }
+
+  #calibration-screen p {
+    font-size: 0.95rem;
+    color: var(--mortar);
+    margin-bottom: 24px;
+    line-height: 1.6;
+  }
+
+  #calib-video-wrap {
+    position: relative;
+    display: inline-block;
+    margin-bottom: 20px;
+  }
+
+  #calib-feed {
+    width: 240px;
+    height: 180px;
+    border: 2px solid #444;
+    border-radius: 4px;
+    transform: scaleX(-1);
+    display: block;
+    background: #000;
+  }
+
+  #calib-overlay-canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 240px;
+    height: 180px;
+    transform: scaleX(-1);
+    pointer-events: none;
+    border-radius: 4px;
+  }
+
+  #calib-crosshair {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 40px;
+    pointer-events: none;
+  }
+  #calib-crosshair::before, #calib-crosshair::after {
+    content: '';
+    position: absolute;
+    background: rgba(204,17,0,0.6);
+  }
+  #calib-crosshair::before { width: 1px; height: 100%; left: 50%; }
+  #calib-crosshair::after  { height: 1px; width: 100%; top: 50%; }
+
+  #calib-progress-wrap {
+    width: 100%;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 2px;
+    height: 10px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  #calib-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--glow);
+    transition: width 0.1s linear;
+    border-radius: 2px;
+  }
+
+  #calib-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--mortar);
+    margin-bottom: 20px;
+    min-height: 1.4em;
+  }
+
+  #calib-status.ok { color: #88cc44; }
+  #calib-status.warn { color: var(--red); }
+
+  #calib-btn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.2rem;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    background: var(--red);
+    border: none;
+    padding: 12px 40px;
+    cursor: pointer;
+    border-radius: 2px;
+    box-shadow: 0 4px 0 #7a0000, 0 0 15px var(--glow);
+    transition: all 0.1s;
+  }
+  #calib-btn:hover:not(:disabled) { background: #ee1500; transform: translateY(-2px); }
+  #calib-btn:disabled { background: #444; color: #777; box-shadow: none; cursor: default; }
+</style>
+</head>
+<body>
+
+<div id="wall"></div>
+<div id="overlay"></div>
+
+<div id="content">
+
+  <!-- SETUP SCREEN -->
+  <div id="setup-screen" class="screen active">
+    <h1>THE WALL</h1>
+    <p class="subtitle">Fantasy Football Punishment System v1.0</p>
+    <ul class="rules">
+      <li>Stare at the wall. Do not look away.</li>
+      <li>You do not know how much time has passed.</li>
+      <li>When you think an hour is up — press the button.</li>
+      <li>If you're early, the clock resets. Start over.</li>
+      <li>Looking away pauses your progress and adds a penalty.</li>
+    </ul>
+    <div class="camera-note">
+      ⚠ CAMERA REQUIRED — your eyes will be tracked.<br>
+      Allow webcam access when prompted. Sit still.
+    </div>
+    <button id="start-btn" onclick="goToCalibration()">BEGIN PUNISHMENT</button>
+  </div>
+
+  <!-- CALIBRATION SCREEN -->
+  <div id="calibration-screen" class="screen">
+    <h2>CALIBRATION</h2>
+    <p>
+      Look <strong>directly at the camera</strong> and hold still.<br>
+      This sets your neutral head position.
+    </p>
+    <div id="calib-video-wrap">
+      <video id="calib-feed" autoplay muted playsinline></video>
+      <canvas id="calib-overlay-canvas"></canvas>
+      <div id="calib-crosshair"></div>
+    </div>
+    <div id="calib-progress-wrap">
+      <div id="calib-progress-bar"></div>
+    </div>
+    <div id="calib-status">Initializing camera...</div>
+    <button id="calib-btn" onclick="startCalibration()" disabled>CALIBRATE</button>
+  </div>
+
+  <!-- STARE SCREEN -->
+  <div id="stare-screen" class="screen">
+    <div id="stare-label">STARE AT THE WALL</div>
+    <div id="crosshair">
+      <div class="ch-circle"></div>
+      <div class="ch-circle"></div>
+      <div class="ch-circle"></div>
+    </div>
+  </div>
+
+  <!-- REVEAL SCREEN -->
+  <div id="reveal-screen" class="screen">
+    <h2>YOU PRESSED THE BUTTON</h2>
+    <div id="elapsed-display">--:--</div>
+    <div id="result-msg"></div>
+    <div id="penalties-summary"></div>
+    <button class="reveal-btn" id="try-again-btn" onclick="restart()">TRY AGAIN</button>
+    <button class="reveal-btn" id="done-forever-btn" onclick="freedomScreen()">I SERVED MY TIME</button>
+  </div>
+
+</div>
+
+<!-- STARE SCREEN extras (outside content for fixed positioning) -->
+<div id="look-away-flash">
+  <h2>EYES ON THE WALL</h2>
+  <p id="look-away-sub">Look away penalty applied. Keep staring.</p>
+</div>
+
+<div id="penalty-display" style="display:none">
+  LOOK-AWAYS: <span id="penalty-count">0</span><br>
+  <span style="font-size:0.7rem;color:#555">TIME PAUSED WHILE AWAY</span>
+</div>
+
+<div id="cam-container" style="display:none">
+  <video id="cam-feed" autoplay muted playsinline></video>
+  <div id="cam-label">WATCHING YOU</div>
+  <div id="eye-status" class="no-cam">initializing...</div>
+</div>
+
+<button id="done-btn" style="display:none" onclick="checkTime()">I'm Done</button>
+
+<script>
+  const GOAL_MS = 60 * 60 * 1000;
+  const CALIB_FRAMES = 30;   // frames to sample for calibration
+  const YAW_LIMIT   = 18;    // degrees tolerance from calibrated neutral
+  const PITCH_LIMIT = 22;
+  const AWAY_THRESHOLD = 2;
+  const BACK_THRESHOLD = 4;
+
+  // State
+  let stream = null;
+  let trackingInterval = null;
+  let calibInterval = null;
+  let startTime = null;
+  let accumulatedMs = 0;
+  let lastTick = null;
+  let isAway = false;
+  let awayStart = null;
+  let penalties = 0;
+  let awayFrames = 0;
+  let presentFrames = 0;
+
+  // Calibration baseline (raw yaw/pitch ratios at neutral)
+  let calibBaseline = { yawRatio: 0, pitchRatio: 0 };
+  let modelsLoaded = false;
+
+  const opts = () => new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 });
+
+  // ---- SCREENS ----
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+
+  // ---- LANDMARK EXTRACTION (shared) ----
+  async function getLandmarks(video) {
+    const result = await faceapi.detectSingleFace(video, opts()).withFaceLandmarks(true);
+    if (!result) return null;
+    const pts = result.landmarks.positions;
+    const box = result.detection.box;
+
+    const faceCenterX = box.x + box.width / 2;
+    const yawRatio = (pts[30].x - faceCenterX) / (box.width / 2);
+
+    const eyeMidY = (pts[36].y + pts[45].y) / 2;
+    const faceHeight = pts[8].y - eyeMidY;
+    const expectedNoseY = eyeMidY + faceHeight * 0.4;
+    const pitchRatio = (pts[30].y - expectedNoseY) / (faceHeight * 0.4);
+
+    return { yawRatio, pitchRatio, pts, box };
+  }
+
+  // ---- NAVIGATION: Setup → Calibration ----
+  async function goToCalibration() {
+    showScreen('calibration-screen');
+    const calibVideo = document.getElementById('calib-feed');
+    const calibStatus = document.getElementById('calib-status');
+    const calibBtn = document.getElementById('calib-btn');
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 320, height: 240, facingMode: 'user' }, audio: false
+      });
+      calibVideo.srcObject = stream;
+      await new Promise(r => { calibVideo.onloadeddata = r; if (calibVideo.readyState >= 2) r(); });
+
+      calibStatus.textContent = 'Loading face models...';
+      calibStatus.className = '';
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+        faceapi.nets.faceLandmark68TinyNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
+      ]);
+      modelsLoaded = true;
+
+      // Live face preview with dot overlay
+      startCalibPreview(calibVideo);
+
+      calibStatus.textContent = 'Look straight at the camera, then click CALIBRATE.';
+      calibStatus.className = 'ok';
+      calibBtn.disabled = false;
+
+    } catch(e) {
+      calibStatus.textContent = 'Camera error: ' + e.message;
+      calibStatus.className = 'warn';
+    }
+  }
+
+  // Draw live nose dot on calib video so user can see detection working
+  function startCalibPreview(video) {
+    const canvas = document.getElementById('calib-overlay-canvas');
+    canvas.width = 240; canvas.height = 180;
+    const ctx = canvas.getContext('2d');
+
+    calibInterval = setInterval(async () => {
+      ctx.clearRect(0, 0, 240, 180);
+      try {
+        const data = await getLandmarks(video);
+        if (!data) return;
+        // Draw nose dot (mirrored because canvas is scaleX(-1))
+        const scaleX = 240 / video.videoWidth;
+        const scaleY = 180 / video.videoHeight;
+        const nx = data.pts[30].x * scaleX;
+        const ny = data.pts[30].y * scaleY;
+        ctx.beginPath();
+        ctx.arc(nx, ny, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#CC1100';
+        ctx.fill();
+        // Draw eye dots
+        [36, 45].forEach(i => {
+          ctx.beginPath();
+          ctx.arc(data.pts[i].x * scaleX, data.pts[i].y * scaleY, 3, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(204,17,0,0.5)';
+          ctx.fill();
+        });
+      } catch(e) {}
+    }, 150);
+  }
+
+  // ---- CALIBRATION: sample 30 frames ----
+  async function startCalibration() {
+    const calibVideo = document.getElementById('calib-feed');
+    const calibStatus = document.getElementById('calib-status');
+    const calibBtn = document.getElementById('calib-btn');
+    const progressBar = document.getElementById('calib-progress-bar');
+
+    calibBtn.disabled = true;
+    clearInterval(calibInterval);
+
+    const samples = [];
+    calibStatus.textContent = 'Hold still...';
+    calibStatus.className = '';
+    progressBar.style.width = '0%';
+
+    for (let i = 0; i < CALIB_FRAMES; i++) {
+      await new Promise(r => setTimeout(r, 80));
+      try {
+        const data = await getLandmarks(calibVideo);
+        if (data) samples.push({ yawRatio: data.yawRatio, pitchRatio: data.pitchRatio });
+      } catch(e) {}
+      progressBar.style.width = `${Math.round((i + 1) / CALIB_FRAMES * 100)}%`;
+    }
+
+    if (samples.length < 10) {
+      calibStatus.textContent = '⚠ Not enough face data — reposition and try again.';
+      calibStatus.className = 'warn';
+      calibBtn.disabled = false;
+      startCalibPreview(calibVideo);
+      return;
+    }
+
+    // Average the samples
+    calibBaseline.yawRatio   = samples.reduce((s, x) => s + x.yawRatio,   0) / samples.length;
+    calibBaseline.pitchRatio = samples.reduce((s, x) => s + x.pitchRatio, 0) / samples.length;
+
+    calibStatus.textContent = `✓ Calibrated! Neutral yaw: ${(calibBaseline.yawRatio * 50).toFixed(1)}°  pitch offset: ${(calibBaseline.pitchRatio * 45).toFixed(1)}°`;
+    calibStatus.className = 'ok';
+    progressBar.style.width = '100%';
+
+    // Short pause then launch
+    await new Promise(r => setTimeout(r, 900));
+    startPunishment();
+  }
+
+  // ---- START PUNISHMENT (after calibration) ----
+  function startPunishment() {
+    showScreen('stare-screen');
+    document.getElementById('done-btn').style.display = 'block';
+    document.getElementById('penalty-display').style.display = 'block';
+
+    // Hand off stream to the small monitoring video
+    const monVideo = document.getElementById('cam-feed');
+    monVideo.srcObject = stream;
+    document.getElementById('cam-container').style.display = 'block';
+
+    startTime = Date.now();
+    accumulatedMs = 0;
+    isAway = false;
+    penalties = 0;
+    awayFrames = 0;
+    presentFrames = 0;
+    lastTick = null;
+    updatePenaltyDisplay();
+
+    startLandmarkTracking(monVideo);
+  }
+
+  // ---- LANDMARK TRACKING (during punishment) ----
+  function startLandmarkTracking(video) {
+    const eyeStatus = document.getElementById('eye-status');
+
+    trackingInterval = setInterval(async () => {
+      if (!video.readyState || video.readyState < 2) return;
+      try {
+        const data = await getLandmarks(video);
+
+        if (!data) {
+          handleAwayFrame('⚠ NO FACE DETECTED');
+          return;
+        }
+
+        // Subtract calibration baseline
+        const yawRatio   = data.yawRatio   - calibBaseline.yawRatio;
+        const pitchRatio = data.pitchRatio - calibBaseline.pitchRatio;
+        const yawDeg     = Math.abs(yawRatio * 50);
+        const pitchDeg   = Math.abs(pitchRatio * 45);
+
+        if (yawDeg > YAW_LIMIT || pitchDeg > PITCH_LIMIT) {
+          const dir = yawDeg > YAW_LIMIT ? (yawRatio > 0 ? 'RIGHT' : 'LEFT') : 'UP/DOWN';
+          handleAwayFrame(`⚠ TURNED ${dir} (${Math.round(yawDeg)}°)`);
+        } else {
+          handlePresentFrame();
+          eyeStatus.textContent = `👁 ON WALL  yaw:${Math.round(yawDeg)}° pitch:${Math.round(pitchDeg)}°`;
+          eyeStatus.className = 'ok';
+        }
+      } catch(e) {}
+    }, 120);
+  }
+
+  function handleAwayFrame(msg) {
+    awayFrames++; presentFrames = 0;
+    if (awayFrames >= AWAY_THRESHOLD && !isAway) markAway();
+    if (isAway) {
+      document.getElementById('eye-status').textContent = msg;
+      document.getElementById('eye-status').className = 'warn';
+    }
+  }
+
+  function handlePresentFrame() {
+    presentFrames++; awayFrames = 0;
+    if (presentFrames >= BACK_THRESHOLD && isAway) markReturned();
+  }
+
+  // ---- LOOK AWAY ----
+  function markAway() {
+    if (isAway) return;
+    isAway = true; awayStart = Date.now(); penalties++;
+    updatePenaltyDisplay();
+    document.getElementById('look-away-sub').textContent = `Look-away #${penalties} recorded. Eyes on the wall.`;
+    document.getElementById('look-away-flash').classList.add('active');
+    document.getElementById('overlay').style.background = 'rgba(100,0,0,0.3)';
+  }
+
+  function markReturned() {
+    if (!isAway) return;
+    isAway = false; awayStart = null;
+    document.getElementById('look-away-flash').classList.remove('active');
+    document.getElementById('overlay').style.background = 'rgba(0,0,0,0)';
+    document.getElementById('eye-status').textContent = '👁 BACK ON WALL';
+    document.getElementById('eye-status').className = 'ok';
+  }
+
+  function updatePenaltyDisplay() {
+    document.getElementById('penalty-count').textContent = penalties;
+  }
+
+  // ---- TIMER ----
+  setInterval(() => {
+    if (!startTime) return;
+    const now = Date.now();
+    if (!isAway) {
+      if (lastTick !== null) accumulatedMs += (now - lastTick);
+      lastTick = now;
+    } else {
+      lastTick = null;
+    }
+  }, 100);
+
+  // ---- CHECK TIME ----
+  function checkTime() {
+    const elapsed = accumulatedMs;
+    showScreen('reveal-screen');
+    document.getElementById('done-btn').style.display = 'none';
+    document.getElementById('penalty-display').style.display = 'none';
+    document.getElementById('cam-container').style.display = 'none';
+    document.getElementById('look-away-flash').classList.remove('active');
+
+    if (trackingInterval) clearInterval(trackingInterval);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    const totalSec = Math.floor(elapsed / 1000);
+    const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const secs = String(totalSec % 60).padStart(2, '0');
+
+    document.getElementById('elapsed-display').textContent = `${mins}:${secs}`;
+    document.getElementById('penalties-summary').textContent = `Look-away infractions: ${penalties}`;
+
+    const resultEl = document.getElementById('result-msg');
+    if (elapsed >= GOAL_MS) {
+      resultEl.textContent = `You made it. ${mins} minutes and ${secs} seconds of pure, unblinking obedience. Your debt is paid.`;
+      resultEl.className = 'win';
+      document.getElementById('done-forever-btn').style.display = 'inline-block';
+    } else {
+      const remaining = GOAL_MS - elapsed;
+      const remMins = Math.floor(remaining / 60000);
+      const remSecs = Math.floor((remaining % 60000) / 1000);
+      resultEl.textContent = `Not even close. You still have ${remMins}m ${remSecs}s to go. The wall will be waiting.`;
+      resultEl.className = 'fail';
+      document.getElementById('done-forever-btn').style.display = 'none';
+    }
+  }
+
+  // ---- RESTART ----
+  function restart() {
+    if (trackingInterval) clearInterval(trackingInterval);
+    if (calibInterval) clearInterval(calibInterval);
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null; trackingInterval = null; calibInterval = null;
+    startTime = null; accumulatedMs = 0; lastTick = null;
+    isAway = false; awayStart = null; penalties = 0;
+    awayFrames = 0; presentFrames = 0;
+    calibBaseline = { yawRatio: 0, pitchRatio: 0 };
+    document.getElementById('look-away-flash').classList.remove('active');
+    document.getElementById('calib-btn').disabled = true;
+    document.getElementById('calib-status').textContent = 'Initializing camera...';
+    document.getElementById('calib-status').className = '';
+    document.getElementById('calib-progress-bar').style.width = '0%';
+    showScreen('setup-screen');
+  }
+
+  function freedomScreen() {
+    document.getElementById('reveal-screen').innerHTML = `
+      <h2 style="font-family:'Oswald',sans-serif;font-size:2.5rem;color:#88cc44;letter-spacing:0.1em;">PUNISHMENT COMPLETE</h2>
+      <p style="font-size:1.1rem;color:#aaa;margin-top:20px;line-height:1.8">
+        You stared. You suffered.<br>The wall saw everything.<br><br>
+        <span style="color:#88cc44">Never finish last again.</span>
+      </p>
+    `;
+  }
+</script>
+</body>
+</html>
