@@ -397,6 +397,43 @@
     margin-bottom: 28px;
   }
 
+  /* Recording playback */
+  #recording-section {
+    width: 100%;
+    margin-bottom: 20px;
+    display: none;
+  }
+  #recording-section h3 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 0.1em;
+    color: var(--mortar);
+    margin-bottom: 10px;
+  }
+  #playback-video {
+    width: 100%;
+    max-height: 200px;
+    border: 1px solid #444;
+    border-radius: 3px;
+    background: #000;
+    display: block;
+    margin-bottom: 10px;
+  }
+  #download-btn {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.1em;
+    color: var(--text);
+    background: #333;
+    border: 1px solid #555;
+    padding: 8px 20px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    width: 100%;
+  }
+  #download-btn:hover { background: #444; border-color: #777; }
+
   .reveal-btn {
     font-family: 'Oswald', sans-serif;
     font-size: 1.1rem;
@@ -722,6 +759,11 @@
     <div id="elapsed-display">--:--</div>
     <div id="result-msg"></div>
     <div id="penalties-summary"></div>
+    <div id="recording-section">
+      <h3>⦿ RECORDED EVIDENCE</h3>
+      <video id="playback-video" controls playsinline></video>
+      <button id="download-btn" onclick="downloadRecording()">⬇ DOWNLOAD VIDEO</button>
+    </div>
     <button class="reveal-btn" id="try-again-btn" onclick="restart()">TRY AGAIN</button>
     <button class="reveal-btn" id="done-forever-btn" onclick="freedomScreen()">I SERVED MY TIME</button>
   </div>
@@ -765,6 +807,9 @@
 
   // State
   let stream = null;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recordingBlob = null;
   let trackingInterval = null;
   let calibInterval = null;
   let startTime = null;
@@ -940,9 +985,10 @@
   document.addEventListener('mozfullscreenchange', onFullscreenChange);
 
   function onFullscreenChange() {
-    if (!startTime) return; // only care during active punishment
+    if (!startTime) return;
     if (!isFullscreen()) {
-      // They escaped — reset the clock and scold them
+      // Only punish if still actively in the punishment
+      if (!document.getElementById('stare-screen').classList.contains('active')) return;
       accumulatedMs = 0;
       lastTick = null;
       penalties = 0;
@@ -974,6 +1020,46 @@
 
     enterFullscreen();
     startLandmarkTracking(monVideo);
+    startRecording();
+  }
+
+  // ---- RECORDING ----
+  function startRecording() {
+    recordedChunks = [];
+    recordingBlob = null;
+    try {
+      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4';
+
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        recordingBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+        const url = URL.createObjectURL(recordingBlob);
+        const playback = document.getElementById('playback-video');
+        playback.src = url;
+        document.getElementById('recording-section').style.display = 'block';
+      };
+      mediaRecorder.start(1000); // chunk every second
+    } catch(e) {
+      console.warn('Recording not supported:', e);
+    }
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  }
+
+  function downloadRecording() {
+    if (!recordingBlob) return;
+    const ext = recordingBlob.type.includes('mp4') ? 'mp4' : 'webm';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(recordingBlob);
+    a.download = `wall-punishment-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.${ext}`;
+    a.click();
   }
 
   // ---- LANDMARK TRACKING (during punishment) ----
@@ -1067,6 +1153,7 @@
     document.getElementById('look-away-flash').classList.remove('active');
 
     if (trackingInterval) clearInterval(trackingInterval);
+    stopRecording();
     if (stream) stream.getTracks().forEach(t => t.stop());
 
     const totalSec = Math.floor(elapsed / 1000);
@@ -1095,8 +1182,12 @@
   function restart() {
     if (trackingInterval) clearInterval(trackingInterval);
     if (calibInterval) clearInterval(calibInterval);
+    stopRecording();
     if (stream) stream.getTracks().forEach(t => t.stop());
-    stream = null; trackingInterval = null; calibInterval = null;
+    stream = null; trackingInterval = null; calibInterval = null; mediaRecorder = null;
+    recordedChunks = []; recordingBlob = null;
+    document.getElementById('recording-section').style.display = 'none';
+    document.getElementById('playback-video').src = '';
     startTime = null; accumulatedMs = 0; lastTick = null;
     isAway = false; awayStart = null; penalties = 0;
     awayFrames = 0; presentFrames = 0;
