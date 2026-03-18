@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>THE WALL</title>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 <style>
@@ -530,6 +530,49 @@
   }
   #calib-btn:hover:not(:disabled) { background: #ee1500; transform: translateY(-2px); }
   #calib-btn:disabled { background: #444; color: #777; box-shadow: none; cursor: default; }
+  /* ---- MOBILE ---- */
+  @media (max-width: 600px) {
+    #setup-screen {
+      padding: 28px 20px;
+      margin: 12px;
+      max-width: 100%;
+    }
+    #setup-screen h1 { font-size: 2.2rem; }
+    #setup-screen .subtitle { font-size: 0.85rem; margin-bottom: 18px; }
+    .rules li { font-size: 0.88rem; }
+    .camera-note { font-size: 0.72rem; }
+    #start-btn { font-size: 1.1rem; padding: 12px 32px; }
+
+    #calibration-screen {
+      padding: 24px 18px;
+      margin: 12px;
+      max-width: 100%;
+    }
+    #calibration-screen h2 { font-size: 1.5rem; }
+    #calibration-screen p { font-size: 0.85rem; margin-bottom: 16px; }
+    #calib-feed, #calib-overlay-canvas { width: 200px; height: 150px; }
+    #calib-btn { font-size: 1rem; padding: 10px 28px; }
+
+    #reveal-screen {
+      padding: 28px 20px;
+      margin: 12px;
+      max-width: 100%;
+    }
+    #reveal-screen h2 { font-size: 1.4rem; }
+    #elapsed-display { font-size: 2.8rem; }
+    #result-msg { font-size: 0.95rem; }
+    .reveal-btn { font-size: 0.95rem; padding: 10px 24px; }
+
+    #stare-label { font-size: 1.1rem; letter-spacing: 0.15em; top: env(safe-area-inset-top, 20px); white-space: normal; text-align: center; width: 90%; }
+    #look-away-flash h2 { font-size: 2.4rem; }
+    #look-away-flash p { font-size: 0.9rem; text-align: center; padding: 0 16px; }
+
+    #penalty-display { font-size: 0.75rem; right: 12px; top: 12px; }
+    #done-btn { bottom: env(safe-area-inset-bottom, 16px); right: 16px; font-size: 0.85rem; padding: 10px 18px; }
+
+    #cam-container { bottom: env(safe-area-inset-bottom, 12px); left: 12px; }
+    #cam-feed { width: 80px; height: 60px; }
+  }
 </style>
 </head>
 <body>
@@ -621,7 +664,7 @@
   const GOAL_MS = 60 * 60 * 1000;
   const CALIB_FRAMES = 30;   // frames to sample for calibration
   const YAW_LIMIT   = 18;    // degrees tolerance from calibrated neutral
-  const PITCH_LIMIT = 22;
+  const PITCH_LIMIT = 12;
   const AWAY_THRESHOLD = 2;
   const BACK_THRESHOLD = 4;
 
